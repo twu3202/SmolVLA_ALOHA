@@ -1,0 +1,22 @@
+# Data — 2.6 GB of HuggingFace datasets; users re-download via train_generic.py
+Data/
+
+# Checkpoints — 60+ GB of model weights across 11 datasets
+checkpoints/
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+
+# Misc
+*.log
+.claude/
