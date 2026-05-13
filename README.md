@@ -274,6 +274,63 @@ Training auto-downloads any missing dataset on first run. `Data/` is **not** com
 
 ---
 
+## RT-1 vs SmolVLA head-to-head ([RT1_repro/](RT1_repro/))
+
+A second arm of this project reproduces Google's **RT-1** (Robotics Transformer, 2022) on the same datasets and the same Mac MPS hardware, using the [lucidrains PyTorch port](https://github.com/lucidrains/robotic-transformer-pytorch). This isolates the *architecture* effect: same data, same compute, two different action heads.
+
+| Aspect | SmolVLA | RT-1 (this port) |
+|---|---|---|
+| Params | 450 M | 243 M (CLIP frozen) |
+| Backbone | SmolVLM2 frozen + flow-matching expert | MaxViT-base + Token Learner + 6-layer Transformer |
+| Action head | **Continuous** flow-matching, 10-step denoising | **Discrete**, 256 bins per dim, cross-entropy |
+| History | 1 frame | 6 frames |
+| Image size | 512×512 (resize with padding) | 224×224 |
+| Training | 3000 steps, BS=4–16 | 2000 steps, BS=4 |
+
+### Results (3 of 5 datasets done, run still in progress)
+
+| Dataset | SmolVLA L2 | **RT-1 L2** | Δ | Winner |
+|---|---|---|---|---|
+| `aloha_transfer` | 0.729 | **0.589** | −19% | **RT-1** |
+| `aloha_insertion` | **0.716** | 0.744 | +4% | SmolVLA (tied) |
+| `aloha_static_battery` ★REAL | 0.651 | **0.394** | **−40%** | **RT-1** ★★ |
+| `xarm_push` | 0.216 | *(running)* | — | — |
+| `xarm_lift` | 1.324 | *(pending)* | — | — |
+
+![RT-1 vs SmolVLA](RT1_repro/eval_output/rt1_vs_smolvla.png)
+
+### Three findings so far
+
+**1. RT-1 dominates on real-robot data (−40% on battery).** On `aloha_static_battery`, RT-1's per-dim MAE for the **left arm** (dims 0–7) is 0.006–0.078, while SmolVLA's is 0.025–0.274 — up to **10× lower**. Discrete action tokens (256 bins) recover the highly stereotyped joint trajectories of real demos with much less precision loss than flow-matching's continuous prediction. The action space "rounds to the nearest bin" exactly when the demonstrator's hand was tremor-stable.
+
+**2. SmolVLA wins (barely) on precision-critical sim tasks.** On `aloha_insertion`, the +4% gap reflects the rounding cost of 256-bin discretization: peg insertion needs sub-bin angular precision near the contact point. SmolVLA's continuous head pays no quantisation cost there. The result is essentially a tie within noise.
+
+**3. Same gripper bottleneck, different architectures.** Both models' worst dim on every ALOHA task is the **right-arm gripper (dim 13)**: RT-1 MAE 0.13–0.24, SmolVLA MAE 0.14–0.27. The gripper is binary-like (open/close) with very few transition frames; both action heads struggle equally. This is a **data-side bottleneck**, not architecture-side.
+
+### What this tells us
+
+- For a **143 M-parameter smaller model**, RT-1 is competitive or better on 2/3 measured datasets so far — the heavy SmolVLM2 backbone is *not* the limiting factor on small datasets (~50 episodes).
+- The architecture trade-off is **continuous-vs-discrete actions**, not vision capacity. Discrete tokens win when demonstrations are stereotyped (real-robot); continuous wins when sub-bin precision matters (peg insertion).
+- Combined model size: **243 M** (RT-1) + **450 M** (SmolVLA) = 693 M params trained on the same Mac MPS, no NVIDIA GPU.
+
+### Reproducing the RT-1 arm
+
+```bash
+cd /Users/r/Projects/SmolVLA_ALOHA
+pip install robotic-transformer-pytorch tiktoken sentencepiece
+
+# Train + eval on any LeRobot v3 dataset already in dataset_configs.py
+DATASET=aloha_static_battery TRAIN_STEPS=2000 $PY RT1_repro/train_rt1.py
+DATASET=aloha_static_battery STEP=2000 N_EVAL_EP=8 $PY RT1_repro/eval_rt1.py
+
+# Generate head-to-head plot
+$PY RT1_repro/compare_rt1_vs_smolvla.py
+```
+
+The RT-1 trainer reuses SmolVLA's `dataset_configs.py` registry and `LeRobotDataset` helpers — adding new datasets to one project adds them to the other automatically.
+
+---
+
 ## Related project
 
 [**SmolVLA_cl**](https://github.com/twu3202/SmolVLA_cl) — SmolVLA + LIBERO + EEG as a fourth modality. Where this repo studies cross-embodiment generalisation, the `cl` repo studies whether a brain signal (EEG motor imagery) can be added as a controllable input. Both run on the same hardware (Apple MPS) and share the same SmolVLA architecture; only the embodiments and modalities differ.
