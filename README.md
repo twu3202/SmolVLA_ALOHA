@@ -287,31 +287,51 @@ A second arm of this project reproduces Google's **RT-1** (Robotics Transformer,
 | Image size | 512×512 (resize with padding) | 224×224 |
 | Training | 3000 steps, BS=4–16 | 2000 steps, BS=4 |
 
-### Results (3 of 5 datasets done, run still in progress)
+### Final results (all 5 datasets complete)
 
 | Dataset | SmolVLA L2 | **RT-1 L2** | Δ | Winner |
 |---|---|---|---|---|
 | `aloha_transfer` | 0.729 | **0.589** | −19% | **RT-1** |
 | `aloha_insertion` | **0.716** | 0.744 | +4% | SmolVLA (tied) |
 | `aloha_static_battery` ★REAL | 0.651 | **0.394** | **−40%** | **RT-1** ★★ |
-| `xarm_push` | 0.216 | *(running)* | — | — |
-| `xarm_lift` | 1.324 | *(pending)* | — | — |
+| `xarm_push` (3-DOF, no gripper) | 0.216 | **0.123** | **−43%** | **RT-1** ★★★ |
+| `xarm_lift` (4-DOF, with gripper) | **1.324** | 1.890 | **+43%** | **SmolVLA** ★★ |
+
+**Score: 3–2 RT-1**. But the split is not random — it follows a clean rule:
+
+- **RT-1 wins** when actions are continuous & stereotyped (transfer, battery, push)
+- **SmolVLA wins** when (a) actions need sub-bin precision near contact (insertion) or (b) the task is hard enough that the pretrained VLM backbone gives real headroom (lift)
 
 ![RT-1 vs SmolVLA](RT1_repro/eval_output/rt1_vs_smolvla.png)
 
-### Three findings so far
+### Four findings
 
-**1. RT-1 dominates on real-robot data (−40% on battery).** On `aloha_static_battery`, RT-1's per-dim MAE for the **left arm** (dims 0–7) is 0.006–0.078, while SmolVLA's is 0.025–0.274 — up to **10× lower**. Discrete action tokens (256 bins) recover the highly stereotyped joint trajectories of real demos with much less precision loss than flow-matching's continuous prediction. The action space "rounds to the nearest bin" exactly when the demonstrator's hand was tremor-stable.
+**1. RT-1 dominates on stereotyped continuous control (up to −43%).** On `aloha_static_battery`, RT-1's per-dim MAE for the **left arm** (dims 0–7) is 0.006–0.078, while SmolVLA's is 0.025–0.274 — up to **10× lower**. On `xarm_push` (no gripper), RT-1's per-dim MAE is **flat 0.055–0.065** vs SmolVLA's 0.064–0.159. Discrete action tokens (256 bins) recover the highly stereotyped joint trajectories of real demos with much less precision loss than continuous flow-matching. The action space "rounds to the nearest bin" exactly when the demonstrator's hand was tremor-stable.
 
-**2. SmolVLA wins (barely) on precision-critical sim tasks.** On `aloha_insertion`, the +4% gap reflects the rounding cost of 256-bin discretization: peg insertion needs sub-bin angular precision near the contact point. SmolVLA's continuous head pays no quantisation cost there. The result is essentially a tie within noise.
+**2. Discrete actions fail on hard tasks (+43% worse on `xarm_lift`).** This is the surprising flip: on `xarm_lift`, RT-1's per-dim MAE is **0.70 / 0.83 / 0.81 / 0.80** vs SmolVLA's **0.53 / 0.58 / 0.59 / 0.56** — RT-1 is uniformly 30–40% worse on **every** dim, not just the gripper. With 2000 steps and no pretrained vision-language backbone, RT-1 cannot learn xarm_lift's tighter dynamics (84×84 images + binary gripper + larger z-range). SmolVLA's frozen SmolVLM2 backbone provides robust visual representations even on tiny images. **The 207M-parameter gap matters most when the task is genuinely hard.**
 
-**3. Same gripper bottleneck, different architectures.** Both models' worst dim on every ALOHA task is the **right-arm gripper (dim 13)**: RT-1 MAE 0.13–0.24, SmolVLA MAE 0.14–0.27. The gripper is binary-like (open/close) with very few transition frames; both action heads struggle equally. This is a **data-side bottleneck**, not architecture-side.
+**3. SmolVLA wins narrowly on precision-critical contact (+4% on insertion).** Peg insertion needs sub-bin angular precision near the contact point. The 256-bin quantization cost shows up here, but only as a 4% tie — noise level.
+
+**4. The gripper-binary problem is universal.** Both models' worst dim on every ALOHA task is the **right-arm gripper (dim 13)**: RT-1 MAE 0.13–0.24, SmolVLA MAE 0.14–0.27. Gripper is open/close with very few transition frames; both action heads struggle equally. This is a **data-side bottleneck** (sparse class-imbalanced labels), not architecture-side.
 
 ### What this tells us
 
-- For a **143 M-parameter smaller model**, RT-1 is competitive or better on 2/3 measured datasets so far — the heavy SmolVLM2 backbone is *not* the limiting factor on small datasets (~50 episodes).
-- The architecture trade-off is **continuous-vs-discrete actions**, not vision capacity. Discrete tokens win when demonstrations are stereotyped (real-robot); continuous wins when sub-bin precision matters (peg insertion).
-- Combined model size: **243 M** (RT-1) + **450 M** (SmolVLA) = 693 M params trained on the same Mac MPS, no NVIDIA GPU.
+| Regime | Architecture choice |
+|---|---|
+| Easy continuous task, small data | **RT-1 / discrete actions win** (-19% to -43%) |
+| Precision contact in sim | SmolVLA wins barely (+4%) |
+| Hard task with low-res images | **SmolVLA / pretrained VLM wins** (+43%) |
+| Binary signals (gripper) | **Both struggle equally** — data problem |
+
+Two simultaneous trends are visible:
+- **Action-head trade-off**: discrete bins cost quantization but save inductive bias; continuous flow-matching pays no quantization tax but needs more data to denoise.
+- **Backbone-capacity trade-off**: SmolVLM2's 450M frozen params are not "wasted" — they buy robustness on hard tasks (xarm_lift) even when the action head is identical.
+
+For a Mac-scale reproduction (~50 episodes per task), **the right architecture depends on task difficulty**:
+- Predictable, stereotyped behaviour → use RT-1 (smaller, faster, often better).
+- Hard or out-of-distribution behaviour → use SmolVLA-style pretrained backbone for headroom.
+
+Combined model size: **243 M** (RT-1) + **450 M** (SmolVLA) = 693 M params trained on the same Mac MPS, no NVIDIA GPU.
 
 ### Reproducing the RT-1 arm
 
