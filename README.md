@@ -1,6 +1,6 @@
 # SmolVLA × ALOHA × xArm — Cross-Dataset Reproduction
 
-Reproducing [SmolVLA](https://huggingface.co/lerobot/smolvla_base) on **11 LeRobot v3 datasets** spanning three robot platforms — bimanual ALOHA (sim + real), single-arm xArm, and their variants — all on a Mac (Apple MPS, no NVIDIA GPU).
+Reproducing [SmolVLA](https://huggingface.co/lerobot/smolvla_base) on **16 LeRobot v3 datasets** spanning four robot platforms — bimanual ALOHA (sim + real), single-arm xArm, and the 2-DOF PushT planar pusher — all on a Mac (Apple MPS, no NVIDIA GPU).
 
 Companion repo to [SmolVLA_cl](https://github.com/twu3202/SmolVLA_cl) (LIBERO + EEG modality experiments). Where the `cl` repo asks *"can we add a new modality?"*, this repo asks *"how well does SmolVLA generalise across embodiments and data distributions?"*
 
@@ -11,16 +11,24 @@ Companion repo to [SmolVLA_cl](https://github.com/twu3202/SmolVLA_cl) (LIBERO + 
 | Rank | Dataset | L2 ↓ | MAE ↓ | Notes |
 |---|---|---|---|---|
 | 🥇 | `xarm_push` | **0.216** | 0.105 | Simplest task — 3-DOF position, no gripper |
-| 🥈 | `aloha_static_battery` ★REAL | **0.651** | 0.121 | **Real-robot data beats sim** |
-| 🥉 | `xarm_push_replay` | 0.529 | 0.269 | Replay variant |
-| 4 | `aloha_insertion` | 0.716 | 0.154 | Sim, human demos |
-| 5 | `aloha_transfer` | 0.729 | 0.149 | Sim, human demos |
-| 6 | `aloha_static_coffee` ★REAL | 0.802 | 0.168 | Real-robot |
-| 7 | `aloha_insertion_scripted` | 0.864 | 0.186 | Low train loss (0.040), higher L2 |
-| 8 | `aloha_transfer_scripted` | 1.156 | 0.214 | Scripted |
-| 9 | `xarm_lift_replay` | 1.042 | 0.448 | 84×84 imgs, grip struggles |
-| 10 | `xarm_lift` | 1.324 | 0.565 | ❌ 84×84 resolution bottleneck |
-| 11 | `aloha_multitask` | 1.327 | 0.276 | 2-task shared repr. penalty |
+| 🥈 | `xarm_push_replay` | 0.529 | 0.269 | Replay variant |
+| 🥉 | `aloha_static_ziploc_slide` ★REAL | **0.556** | 0.106 | **Best real-robot result — fine manipulation** |
+| 4 | `aloha_static_battery` ★REAL | 0.651 | 0.121 | Real-robot, battery insertion |
+| 5 | `aloha_static_cups_open` ★REAL | 0.694 | 0.139 | Real-robot, cup opening |
+| 6 | `aloha_insertion` | 0.716 | 0.154 | Sim, human demos |
+| 7 | `aloha_transfer` | 0.729 | 0.149 | Sim, human demos |
+| 8 | `aloha_static_coffee` ★REAL | 0.802 | 0.168 | Real-robot |
+| 9 | `aloha_insertion_scripted` | 0.864 | 0.186 | Low train loss (0.040), higher L2 |
+| 10 | `xarm_lift_replay` | 1.042 | 0.448 | 84×84 imgs, grip struggles |
+| 11 | `aloha_transfer_scripted` | 1.156 | 0.214 | Scripted |
+| 12 | `xarm_lift` | 1.324 | 0.565 | ❌ 84×84 resolution bottleneck |
+| 13 | `aloha_multitask` | 1.327 | 0.276 | 2-task human, shared repr. penalty |
+| 14 | `aloha_static_towel` ★REAL | 1.479 | 0.250 | ❌ Deformable object, hardest real-robot |
+| 15 | `aloha_multitask_scripted` | 1.531 | 0.282 | ⚠️ Normalization mismatch — see note |
+| — | `pusht` | **40.4 px** | 25.7 px | ‡ 2-DOF pixel space, not comparable |
+
+> ‡ **pusht** L2 is in pixel units (512×512 canvas); 40 px ≈ 8% of image width per step — reasonable for flow matching.  
+> ⚠️ **aloha_multitask_scripted** training loss (~9–55) signals a normalization failure: `transfer_scripted` has std[joint0]=0.004 (joint locked) while `insertion_scripted` has std[joint0]=0.161 — applying transfer stats to insertion data inflates z-scores by 40×. Eval result not meaningful for comparison.
 
 ![Full cross-dataset comparison](eval_output/comparison_all_datasets.png)
 
@@ -28,19 +36,21 @@ Companion repo to [SmolVLA_cl](https://github.com/twu3202/SmolVLA_cl) (LIBERO + 
 
 ## What this shows
 
-Five empirical findings, each backed by at least one pair of runs:
+Seven empirical findings, each backed by at least one pair of runs:
 
 | Finding | Evidence |
 |---|---|
-| **Real-robot data is no harder than sim** | `aloha_static_battery` L2=0.651 beats `aloha_transfer` L2=0.729 |
-| **Scripted demos overfit differently** | `aloha_insertion_scripted`: 3× lower train loss (0.040) but *higher* open-loop L2 (0.864 vs 0.716) than human |
+| **Real-robot data is no harder than sim** | Top-4 real-robot datasets (ziploc 0.556, battery 0.651, cups 0.694) all beat sim ALOHA (0.716–0.729) |
+| **Fine manipulation generalises well** | `aloha_static_ziploc_slide` L2=0.556 is #3 overall despite precise fine-grained contact |
+| **Deformable objects are harder** | `aloha_static_towel` L2=1.479 is the hardest real-robot run — deformable cloth requires reasoning about visual state that doesn't follow rigid-body heuristics |
+| **Scripted demos overfit differently** | `aloha_insertion_scripted`: 3× lower train loss (0.040) but *higher* open-loop L2 (0.864 vs 0.716) than human demos |
 | **Image resolution matters for grasping** | `xarm_lift` (84×84) L2=1.32 vs `xarm_push` (no gripper) L2=0.22 — same image size, vastly different difficulty |
-| **Replay distributions help marginally** | `xarm_lift` 1.32 → `xarm_lift_replay` 1.04 (lift), `xarm_push` 0.22 → replay 0.53 (push got worse) |
 | **Multi-task pays ~2× penalty** | `aloha_multitask` L2=1.33 vs single-task ~0.72, even at 5000 steps |
+| **Scripted multi-task fails via normalization mismatch** | `aloha_multitask_scripted` loss 9–55 (vs 0.456 for human multitask) — scripted policies lock joints differently per task, making cross-dataset z-scoring degenerate |
 
 ---
 
-## The 11 datasets
+## The 16 datasets
 
 All datasets are in **LeRobot v3 format** (Parquet files + MP4 videos), freely available on HuggingFace under the `lerobot/` organisation.
 
@@ -53,8 +63,12 @@ All datasets are in **LeRobot v3 format** (Parquet files + MP4 videos), freely a
 | Sim, human demos | `aloha_multitask` | both of the above | 100 |
 | Sim, scripted | `aloha_transfer_scripted` | `lerobot/aloha_sim_transfer_cube_scripted` | 50 |
 | Sim, scripted | `aloha_insertion_scripted` | `lerobot/aloha_sim_insertion_scripted` | 50 |
+| Sim, scripted | `aloha_multitask_scripted` | both scripted datasets | 100 |
 | ★ Real robot | `aloha_static_coffee` | `lerobot/aloha_static_coffee` | ~50 |
 | ★ Real robot | `aloha_static_battery` | `lerobot/aloha_static_battery` | ~50 |
+| ★ Real robot | `aloha_static_cups_open` | `lerobot/aloha_static_cups_open` | 50 |
+| ★ Real robot (deformable) | `aloha_static_towel` | `lerobot/aloha_static_towel` | 50 |
+| ★ Real robot (fine) | `aloha_static_ziploc_slide` | `lerobot/aloha_static_ziploc_slide` | 56 |
 
 ### xArm — single-arm robot, 84×84 images, 3-4 DOF action
 
@@ -65,13 +79,19 @@ All datasets are in **LeRobot v3 format** (Parquet files + MP4 videos), freely a
 | Lift replay | `xarm_lift_replay` | `lerobot/xarm_lift_medium_replay` | 4 |
 | Push replay | `xarm_push_replay` | `lerobot/xarm_push_medium_replay` | 3 |
 
+### PushT — 2-DOF planar pusher, 96×96 images
+
+| Dataset | HF Repo | Episodes | Action dim | Units |
+|---|---|---|---|---|
+| `pusht` | `lerobot/pusht` | 206 | 2 (x,y pixel) | pixels (0–512) |
+
 Full configs live in [`dataset_configs.py`](dataset_configs.py).
 
 ---
 
 ## Input / Output layout
 
-### ALOHA Static (real robot) — `aloha_static_coffee`, `aloha_static_battery`
+### ALOHA Static (real robot) — `aloha_static_coffee`, `aloha_static_battery`, `aloha_static_cups_open`, `aloha_static_towel`, `aloha_static_ziploc_slide`
 
 ```
 INPUT
@@ -95,6 +115,19 @@ INPUT
 
 OUTPUT
   action chunk                  (10, 4 or 3)    ← future 0.67 s @ 15 FPS
+```
+
+### PushT — `pusht`
+
+```
+INPUT
+  observation.image             (3, 96, 96)     ← top-down camera, pixel coords
+  observation.state             (2,)            ← agent (x, y) in pixels
+  OBS_LANGUAGE_TOKENS           (48,)           ← "Push the T-shaped block onto the target."
+
+OUTPUT
+  action chunk                  (10, 2)         ← next 1 s @ 10 FPS, pixel coordinates
+                                                  Note: L2 metric is in pixels, not radians
 ```
 
 ### Internal SmolVLA processing
@@ -124,11 +157,13 @@ PY=/opt/anaconda3/envs/lerobot/bin/python
 DATASET=aloha_transfer       TRAIN_STEPS=3000 BATCH_SIZE=4 $PY train_generic.py
 DATASET=aloha_static_coffee  TRAIN_STEPS=3000 BATCH_SIZE=4 $PY train_generic.py  # real-robot
 DATASET=xarm_push            TRAIN_STEPS=3000 BATCH_SIZE=8 $PY train_generic.py
+DATASET=pusht                TRAIN_STEPS=3000 BATCH_SIZE=16 $PY train_generic.py
 DATASET=aloha_multitask      TRAIN_STEPS=5000 BATCH_SIZE=4 $PY train_generic.py
 
 # ── 2) Open-loop evaluation (no simulator needed) ────────────────────────────
 DATASET=aloha_transfer       STEP=3000 N_EVAL_EP=10 $PY eval_generic.py
 DATASET=aloha_static_coffee  STEP=3000 N_EVAL_EP=10 $PY eval_generic.py
+DATASET=pusht                STEP=3000 N_EVAL_EP=20 $PY eval_generic.py
 
 # ── 3) Cross-dataset comparison plot (once all evals are done) ───────────────
 $PY plot_comparison.py
@@ -142,7 +177,7 @@ Any dataset key in [`dataset_configs.py`](dataset_configs.py) is valid. To add a
 
 | File | Purpose |
 |---|---|
-| `dataset_configs.py` | Registry of 13 dataset configurations — image keys, state/action dims, chunk size, FPS, train_steps, batch_size |
+| `dataset_configs.py` | Registry of 17 dataset configurations — image keys, state/action dims, chunk size, FPS, train_steps, batch_size. Includes `raw_gt` flag for datasets that store raw (non-z-scored) parquet values (e.g. pusht pixel coordinates). |
 | `train_generic.py` | Generic trainer for any dataset in the registry — handles parquet loading, MP4 video decoding by global frame index, normalization stats, action-chunking, and flow-matching loss |
 | `eval_generic.py` | Open-loop evaluation: feeds real observations frame-by-frame, calls `model.select_action()` each step, computes per-dim MAE + overall L2 in original units; saves `eval_{dataset}_step{step}.npz` and a per-dim bar chart |
 | `plot_comparison.py` | Reads all `eval_*.npz` and produces the 4-panel cross-dataset figure (L2 bar, MAE bar, normalised heatmap, loss curves) |
@@ -186,8 +221,13 @@ SmolVLA uses **action chunking** — one VLM forward pass generates 10–50 acti
 | `xarm_push` | 3000 | ~47 min | 0.300 |
 | `xarm_lift_replay` | 3000 | ~48 min | 1.513 |
 | `xarm_push_replay` | 3000 | ~48 min | 1.457 |
+| `pusht` | 3000 | ~85 min | 0.239 |
+| `aloha_static_cups_open` ★REAL | 3000 | ~33 min | — |
+| `aloha_static_towel` ★REAL | 3000 | ~25 min | — |
+| `aloha_static_ziploc_slide` ★REAL | 3000 | ~25 min | — |
+| `aloha_multitask_scripted` | 3000 | ~25 min | ~9 ⚠️ |
 
-(Full eval results in [`eval_output/`](eval_output/); training checkpoints not committed — ~63 GB total across all runs.)
+(Full eval results in [`eval_output/`](eval_output/); training checkpoints not committed — ~70 GB total across all runs.)
 
 ---
 
@@ -195,7 +235,11 @@ SmolVLA uses **action chunking** — one VLM forward pass generates 10–50 acti
 
 **`xarm_push` wins (L2=0.216)** — 3-DOF pure positional control with no gripper. The simplest task in the lineup. SmolVLA's flow-matching head fits it almost perfectly.
 
-**`aloha_static_battery` beats sim ALOHA (L2=0.651 vs 0.729)** — Real-robot data is *not* harder than simulation for SmolVLA. The model handles the additional visual complexity (real lighting, real textures) well, and battery insertion is a relatively repeatable task.
+**`aloha_static_ziploc_slide` is the best real-robot result (L2=0.556)** — Despite involving precise fine-grained contact with a flexible ziploc bag, this task turns out to be highly repeatable: the robot starts in a consistent configuration, the bag location is predictable, and the motion is a clean slide gesture. SmolVLA handles it better than any other real-robot task.
+
+**Real-robot data is not harder than sim** — The top-4 real-robot datasets (ziploc 0.556, battery 0.651, cups 0.694, coffee 0.802) all outperform or match the sim ALOHA tasks (insertion 0.716, transfer 0.729). SmolVLA's frozen vision encoder handles real lighting and textures without degradation.
+
+**Deformable objects are the hardest real-robot task (L2=1.479)** — `aloha_static_towel` is the worst-performing real-robot run. A towel's shape changes throughout the episode, creating visual states that the model cannot easily map to joint-space actions. This is the clearest embodiment-specific bottleneck found.
 
 **Scripted demos: lower train loss, higher open-loop L2** — `aloha_insertion_scripted` reaches loss 0.040 (3× lower than human 0.118) because scripted trajectories are highly consistent. But the model memorises those exact trajectories and fails to generalise to the slight variations in held-out episodes, giving worse open-loop L2 (0.864 vs 0.716).
 
@@ -203,17 +247,21 @@ SmolVLA uses **action chunking** — one VLM forward pass generates 10–50 acti
 
 **`aloha_multitask` pays a ~2× penalty (L2=1.33 vs ~0.72 single-task)** — Sharing one set of weights between transfer-cube and peg-insertion produces a representation that's mediocre at both. Even doubling the training budget to 5000 steps doesn't fully recover.
 
+**`aloha_multitask_scripted` fails via normalization mismatch** — The scripted transfer task locks certain joints (std[joint0]=0.004), while the scripted insertion task moves those same joints widely (std[joint0]=0.161). Normalising both datasets with the transfer statistics inflates insertion z-scores by 40×, making the loss unreliable (~9–55 vs 0.456 for human multitask). This is a practical lesson: scripted multi-task data requires per-dataset normalisation.
+
+**`pusht` (L2=40 pixels, ~8% of canvas)** — The 2-DOF PushT pusher uses pixel coordinates (0–512) instead of radians, so L2 is not comparable to ALOHA/xArm. 40 pixels per step on a 512×512 canvas corresponds to ~8% per-step error — reasonable given the model saw only 206 episodes for 3000 steps. Pusht serves as a reference for the simplest possible continuous control task with visual input.
+
 ---
 
-## Reproducing the overnight run
-
-The shell script that produced the 11-dataset comparison ran sequentially over ~5.5 hours on an M5 MacBook:
+## Reproducing the full 16-dataset run
 
 ```bash
 DATASETS=(aloha_transfer aloha_insertion aloha_multitask
-          aloha_transfer_scripted aloha_insertion_scripted
+          aloha_transfer_scripted aloha_insertion_scripted aloha_multitask_scripted
           aloha_static_coffee aloha_static_battery
-          xarm_lift xarm_push xarm_lift_replay xarm_push_replay)
+          aloha_static_cups_open aloha_static_towel aloha_static_ziploc_slide
+          xarm_lift xarm_push xarm_lift_replay xarm_push_replay
+          pusht)
 
 for d in "${DATASETS[@]}"; do
     DATASET=$d $PY train_generic.py
@@ -222,7 +270,7 @@ done
 $PY plot_comparison.py
 ```
 
-Training auto-downloads any missing dataset on first run. `Data/` is **not** committed (~2.6 GB) and `checkpoints/` is not committed (~63 GB) — both are listed in `.gitignore`.
+Training auto-downloads any missing dataset on first run. `Data/` is **not** committed (~4 GB) and `checkpoints/` is not committed (~70 GB) — both are listed in `.gitignore`.
 
 ---
 

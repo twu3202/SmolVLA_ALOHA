@@ -102,7 +102,15 @@ def eval_episode(model, tokenizer, df_ep, dataset_dir, task_desc,
                                 tokenizer, device, task_desc, cfg)
         pred_norm = model.select_action(batch).squeeze(0).cpu().numpy()
         preds.append(pred_norm * act_std + act_mean)
-        gts.append(np.array(row[cfg["action_key"]], dtype=np.float32) * act_std + act_mean)
+        gt_raw = np.array(row[cfg["action_key"]], dtype=np.float32)
+        if cfg.get("raw_gt", False):
+            # Parquet stores raw original-unit values (e.g. pixel coords for pusht).
+            # Prediction is already denormalized above; GT needs no further transform.
+            gts.append(gt_raw)
+        else:
+            # Parquet stores values that, when treated as z-scores, reproduce original
+            # units via gt * std + mean (consistent with all ALOHA/xArm datasets).
+            gts.append(gt_raw * act_std + act_mean)
 
     return np.stack(preds), np.stack(gts)
 

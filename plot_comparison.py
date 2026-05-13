@@ -31,36 +31,46 @@ OUT_FILE = OUT_DIR / "comparison_all_datasets.png"
 # Pretty labels and colors per dataset
 DATASET_LABELS = {
     # Sim human
-    "aloha_transfer":            "ALOHA Transfer\n(sim-human, 50ep)",
-    "aloha_insertion":           "ALOHA Insertion\n(sim-human, 50ep)",
-    "aloha_multitask":           "ALOHA Multi-task\n(sim-human, 100ep)",
+    "aloha_transfer":              "ALOHA Transfer\n(sim-human, 50ep)",
+    "aloha_insertion":             "ALOHA Insertion\n(sim-human, 50ep)",
+    "aloha_multitask":             "ALOHA Multi-task\n(sim-human, 100ep)",
     # Sim scripted
-    "aloha_transfer_scripted":   "ALOHA Transfer\n(sim-script, 50ep)",
-    "aloha_insertion_scripted":  "ALOHA Insertion\n(sim-script, 50ep)",
-    "aloha_multitask_scripted":  "ALOHA Multi-task\n(sim-script, 100ep)",
-    # Real robot
-    "aloha_static_coffee":       "ALOHA Coffee\n★REAL ROBOT★",
-    "aloha_static_battery":      "ALOHA Battery\n★REAL ROBOT★",
+    "aloha_transfer_scripted":     "ALOHA Transfer\n(sim-script, 50ep)",
+    "aloha_insertion_scripted":    "ALOHA Insertion\n(sim-script, 50ep)",
+    "aloha_multitask_scripted":    "ALOHA Multi-task\n(sim-script, 100ep)",
+    # Real robot original
+    "aloha_static_coffee":         "ALOHA Coffee\n★REAL★",
+    "aloha_static_battery":        "ALOHA Battery\n★REAL★",
+    # Real robot extended
+    "aloha_static_cups_open":      "ALOHA Cups\n★REAL★",
+    "aloha_static_towel":          "ALOHA Towel\n★REAL deform★",
+    "aloha_static_ziploc_slide":   "ALOHA Ziploc\n★REAL fine★",
     # xArm
-    "xarm_lift":                 "xArm Lift\n(medium, 800ep)",
-    "xarm_push":                 "xArm Push\n(medium, 800ep)",
-    "xarm_lift_replay":          "xArm Lift\n(replay, 800ep)",
-    "xarm_push_replay":          "xArm Push\n(replay, 800ep)",
+    "xarm_lift":                   "xArm Lift\n(medium, 800ep)",
+    "xarm_push":                   "xArm Push\n(medium, 800ep)",
+    "xarm_lift_replay":            "xArm Lift\n(replay, 800ep)",
+    "xarm_push_replay":            "xArm Push\n(replay, 800ep)",
+    # PushT
+    "pusht":                       "PushT\n(2-DOF, 206ep)",
 }
-# Group colors: ALOHA sim human=blue, scripted=cyan, real=red, xArm=green
+# Group colors: ALOHA sim human=blue, scripted=cyan, real=red/orange, xArm=green, pusht=purple
 GROUP_COLORS = {
-    "aloha_transfer":            "#1f77b4",
-    "aloha_insertion":           "#4499cc",
-    "aloha_multitask":           "#2255aa",
-    "aloha_transfer_scripted":   "#17becf",
-    "aloha_insertion_scripted":  "#39d6e8",
-    "aloha_multitask_scripted":  "#0099aa",
-    "aloha_static_coffee":       "#d62728",
-    "aloha_static_battery":      "#e05555",
-    "xarm_lift":                 "#2ca02c",
-    "xarm_push":                 "#5cb85c",
-    "xarm_lift_replay":          "#1a7a1a",
-    "xarm_push_replay":          "#3aaa3a",
+    "aloha_transfer":              "#1f77b4",
+    "aloha_insertion":             "#4499cc",
+    "aloha_multitask":             "#2255aa",
+    "aloha_transfer_scripted":     "#17becf",
+    "aloha_insertion_scripted":    "#39d6e8",
+    "aloha_multitask_scripted":    "#0099aa",
+    "aloha_static_coffee":         "#d62728",
+    "aloha_static_battery":        "#e05555",
+    "aloha_static_cups_open":      "#ff7f0e",
+    "aloha_static_towel":          "#e8963a",
+    "aloha_static_ziploc_slide":   "#cc6622",
+    "xarm_lift":                   "#2ca02c",
+    "xarm_push":                   "#5cb85c",
+    "xarm_lift_replay":            "#1a7a1a",
+    "xarm_push_replay":            "#3aaa3a",
+    "pusht":                       "#9467bd",
 }
 COLORS = list(GROUP_COLORS.values())
 
@@ -122,7 +132,7 @@ def main():
     print(f"Found loss curves for:  {list(loss_curves.keys())}")
 
     # ── Figure layout ────────────────────────────────────────────────────────
-    fig = plt.figure(figsize=(20, 12))
+    fig = plt.figure(figsize=(24, 13))
     gs  = gridspec.GridSpec(2, 3, figure=fig, hspace=0.55, wspace=0.38)
     ax_l2    = fig.add_subplot(gs[0, 0])
     ax_mae   = fig.add_subplot(gs[0, 1])
@@ -136,7 +146,9 @@ def main():
     group_order = ["aloha_transfer","aloha_insertion","aloha_multitask",
                    "aloha_transfer_scripted","aloha_insertion_scripted","aloha_multitask_scripted",
                    "aloha_static_coffee","aloha_static_battery",
-                   "xarm_lift","xarm_push","xarm_lift_replay","xarm_push_replay"]
+                   "aloha_static_cups_open","aloha_static_towel","aloha_static_ziploc_slide",
+                   "xarm_lift","xarm_push","xarm_lift_replay","xarm_push_replay",
+                   "pusht"]
     keys   = [k for k in group_order if k in results] + \
              [k for k in sorted(results.keys()) if k not in group_order]
     labels = [results[k]["label"] for k in keys]
