@@ -6,6 +6,30 @@ Companion repo to [SmolVLA_cl](https://github.com/twu3202/SmolVLA_cl) (LIBERO + 
 
 ---
 
+## Key takeaways — what the whole project says
+
+> **Architecture > Scale > Data Quantity.** At small-data behavior-cloning scale (50–800 episodes), the choice of action head (continuous flow-matching vs. discrete 256-bin tokens) and the choice of pretrained backbone matter more than the parameter count. A 243M-parameter RT-1 beats a 450M-parameter SmolVLA on 3 of 5 benchmarked tasks.
+
+Seven concrete lessons distilled from 16 SmolVLA runs + 5 RT-1 runs on the same Mac MPS:
+
+1. **Real-robot data is no harder than sim** — Top-4 real ALOHA datasets (ziploc 0.556, battery 0.651, cups 0.694, coffee 0.802) outperform sim ALOHA (insertion 0.716, transfer 0.729). The sim-to-real gap is overhyped for behavior cloning.
+
+2. **Architecture choice flips with task difficulty** — RT-1's discrete actions win by −19% to −43% on stereotyped tasks (transfer, battery, push), but lose by +43% on hard ones (xarm_lift). SmolVLA's pretrained SmolVLM2 backbone is the deciding factor when tasks are hard, not the action head.
+
+3. **Scripted demos overfit harder than human** — `aloha_insertion_scripted` reaches train loss 0.040 (vs human 0.118) but evaluates worse (L2 0.864 vs 0.716). Human inconsistency acts as regularization.
+
+4. **Image resolution is a silent bottleneck** — `xarm_push` (84×84, no gripper) is the best dataset overall (L2 0.216); `xarm_lift` (84×84, with gripper) is one of the worst (L2 1.324). Same image, vastly different difficulty — 84×84 can't time the gripper's open/close transitions.
+
+5. **Multi-task pays a ~2× penalty at small data** — `aloha_multitask` L2=1.33 vs ~0.72 single-task. Shared representations need >50 episodes per task to break even.
+
+6. **Normalization mismatch is a real bug** — `aloha_multitask_scripted` failed catastrophically (loss 9–55) because two scripted datasets had std-of-joint-0 differing by 40×. Always verify per-dataset stats compatibility before joint training.
+
+7. **The gripper-binary problem is architecture-independent** — Both RT-1 and SmolVLA fail on the right-arm gripper dim (MAE 0.13–0.27 for both). This is a data-side bottleneck — open/close transitions are 1% of frames — and no amount of model capacity fixes it.
+
+**Methodological win**: All 21 model trainings ran on a single M5 MacBook (no NVIDIA GPU, ~20h total compute). VLA research has a lower entry barrier than commonly assumed.
+
+---
+
 ## TL;DR
 
 | Rank | Dataset | L2 ↓ | MAE ↓ | Notes |
