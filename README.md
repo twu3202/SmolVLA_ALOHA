@@ -4,6 +4,17 @@ Reproducing [SmolVLA](https://huggingface.co/lerobot/smolvla_base) on **16 LeRob
 
 Companion repo to [SmolVLA_cl](https://github.com/twu3202/SmolVLA_cl) (LIBERO + EEG modality experiments). Where the `cl` repo asks *"can we add a new modality?"*, this repo asks *"how well does SmolVLA generalise across embodiments and data distributions?"*
 
+### Trained weights
+
+All 16 SmolVLA checkpoints and the 5 RT-1 checkpoints are published on HuggingFace:
+
+- **[`Twu31/smolvla-cross-embodiment-mps`](https://huggingface.co/Twu31/smolvla-cross-embodiment-mps)** — one checkpoint per dataset, with `dataset_stats.json` and the eval `.npz`/`.png` behind every number in the tables below
+- **[`Twu31/rt1-lerobot-mps`](https://huggingface.co/Twu31/rt1-lerobot-mps)** — the RT-1 arm of the head-to-head
+
+Note the model cards are more precise than this README on one point: these runs use
+`train_expert_only=False`, so only the **vision tower** is frozen — the VLM text tower trains
+too. "SmolVLM2 frozen" below should be read as "frozen vision encoder".
+
 ---
 
 ## Key takeaways — what the whole project says
@@ -375,6 +386,12 @@ The RT-1 trainer reuses SmolVLA's `dataset_configs.py` registry and `LeRobotData
 
 ---
 
-## Related project
+## Related projects
 
 [**SmolVLA_cl**](https://github.com/twu3202/SmolVLA_cl) — SmolVLA + LIBERO + EEG as a fourth modality. Where this repo studies cross-embodiment generalisation, the `cl` repo studies whether a brain signal (EEG motor imagery) can be added as a controllable input. Both run on the same hardware (Apple MPS) and share the same SmolVLA architecture; only the embodiments and modalities differ.
+
+Released weights and data:
+[`Twu31/smolvla-cross-embodiment-mps`](https://huggingface.co/Twu31/smolvla-cross-embodiment-mps) ·
+[`Twu31/rt1-lerobot-mps`](https://huggingface.co/Twu31/rt1-lerobot-mps) ·
+[`Twu31/smolvla-libero-eeg`](https://huggingface.co/Twu31/smolvla-libero-eeg) ·
+[`Twu31/so101_hand_blue_napkin`](https://huggingface.co/datasets/Twu31/so101_hand_blue_napkin)
